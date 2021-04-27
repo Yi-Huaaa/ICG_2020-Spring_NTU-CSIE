@@ -1,0 +1,546 @@
+<!--
+一開始被存到buffer裏，buffer被開在handle裡面，但一開始只是暫存
+之後因為program需要畫圖，program會去bind
+program會再把東西存到attribute
+shader會讀attribute裡的東西
+然後去進行drawarray的動作
+-------------------------------------------
+如果你要創造兩個models，那handle那邊就要創在不同的buffer讀不同的資料進來
+bindbuffer都要另外開給其他幾個models
+-------------------------------------------
+DO:
+先畫出三種東西import進去
+三個東西加上燈
+三個東西加上gouraud shader
+三個東西加上第二種 shader
+三種東西加上第三種 shader
+Implement Flat, Gouraud, and Phong shading 
+-------------------------------------------
+Bonus:
+1. 五樣東西
+2. 五種燈光：調整燈光的按鈕
+3. texture mapping （只有茶壺可以用）
+4. Shiness -> 姜昆易做的
+5. animation shading
+6. clipping -> 還不知道是啥
+7. ray tracing
+-------
+Demo 要求1: 有可能要你把兩個不重疊的東西重疊，設定在同一個位置就好 (part of "translate")
+Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
+
+
+-->
+<html>
+
+<head>
+<title>ICG WebGL &mdash; HW1</title>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+<script type="text/javascript" src="./js/glMatrix-0.9.5.min.js"></script>
+<script type="text/javascript" src="./js/webgl-utils.js"></script>
+
+<!-- 
+    TODO HERE: 
+    modify fragment shader or write another one
+    to implement flat, gouraud and phong shading
+ -->
+<script id="fragmentShader" type="fragment">
+	#extension GL_OES_standard_derivatives : enable
+    precision highp float;
+
+    varying vec4 fragcolor;
+
+    varying vec3 vertex_aVertexPosition;
+    varying vec3 vertex_aFrontColor;
+    varying vec3 vertex_aVertexNormal;
+    varying mat4 vertex_uPMatrix;
+    varying mat4 vertex_uMVMatrix;
+    varying vec3 vertex_shading;
+    varying vec3 vertex_mvNormal;
+
+
+    void main(void) {
+        vec3 aVertexPosition = vertex_aVertexPosition;
+        vec3 aFrontColor = vertex_aFrontColor;
+        vec3 aVertexNormal = vertex_aVertexNormal;
+        mat4 uPMatrix = vertex_uPMatrix;
+        mat4 uMVMatrix = vertex_uMVMatrix;
+        float shading = vertex_shading.x; // only extract the first value
+
+        vec3 gouraud = vec3(0.0, 0.0, 0.0);
+        vec3 finalColor = vec3(0.0, 0.0, 0.0);
+
+        float ka = 0.1;
+        float kd = 0.6;
+        float ks = 0.3;
+
+        vec3 mvVertex = (uMVMatrix * vec4(aVertexPosition, 1.0)).xyz;
+        mat3 normalMVMatrix = mat3(uMVMatrix);
+        vec3 mvNormal = normalMVMatrix * aVertexNormal;
+        vec3 N = vec3(0.0, 0.0, 0.0);//N: Normal
+
+
+        vec3 light[3];
+        vec3 lightColor[3];
+        light[0] = vec3(0, 40, -40);
+        light[1] = vec3(0, -40, -40);
+        light[2] = vec3(40, 0, -40);
+        lightColor[0] = vec3(1.5, 0.0, 0.0);
+        lightColor[1] = vec3(0.0, 1.5, 0.0);
+        lightColor[2] = vec3(0.0, 0.0, 1.0);
+        if (shading == 1.0){ //gouraud shading
+            gl_FragColor = fragcolor;
+            return;
+        }
+
+        for(int i = 0; i < 3; i++){
+            if(shading == 0.0){ //flat shading
+                N = normalize(cross(dFdx(-mvVertex), dFdy(-mvVertex)));
+            }
+            else{//phong shading
+                N = normalize(aVertexNormal);
+            } 
+            vec3 V = -normalize(mvVertex);
+            vec3 L = normalize(light[i] - mvVertex);
+            vec3 H = normalize(L+V);
+
+            vec3 ambient = lightColor[i] * ka * aFrontColor;
+            float cos = max(dot(L, N), 0.0);
+            vec3 diffuse = lightColor[i] * kd * aFrontColor * cos;
+            float cosAlpha = max(dot(H, N), 0.0);
+            vec3 specular = lightColor[i] * ks * pow(cosAlpha, 16.0);
+            //gouraud += (ambient + diffuse + specular);
+            finalColor += (ambient + diffuse + specular);
+        }
+
+        gl_FragColor = vec4(finalColor, 1.0);
+    }
+</script>
+
+<!-- 
+    TODO HERE:
+    modify vertex shader or write another one
+    to implement flat, gouraud and phong shading
+
+    NOTE:
+    if you want to write bonus part (texture mapping),
+    only Teapot.json has extra attribute "vertexTextureCoords"
+    which is used for texture mappping.
+    attribute: 每次傳進來的東西是不一樣的
+ -->
+<script id="vertexShader" type="vertex">
+    attribute vec3 aVertexPosition;
+    attribute vec3 aFrontColor; //就是object的顏色
+    attribute vec3 aVertexNormal;
+
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+    uniform vec3 shading;
+
+	varying vec4 fragcolor;
+
+    varying vec3 vertex_aVertexPosition;
+    varying vec3 vertex_aFrontColor;
+    varying vec3 vertex_aVertexNormal;
+    varying mat4 vertex_uPMatrix;
+    varying mat4 vertex_uMVMatrix;
+    varying vec3 vertex_shading;
+    varying vec3 vertex_mvNormal;
+
+    void main(void) {
+
+        vertex_aVertexPosition = aVertexPosition;
+        vertex_aFrontColor = aFrontColor;
+        vertex_aVertexNormal = aVertexNormal;
+        vertex_uPMatrix = uPMatrix;
+        vertex_uMVMatrix = uMVMatrix;
+        vertex_shading = shading;
+        
+
+
+        gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+        vec3 mvVertex = (uMVMatrix * vec4(aVertexPosition, 1.0)).xyz;
+        mat3 normalMatrix = mat3(uMVMatrix);
+        vec3 mvNormal = normalMatrix * aVertexNormal;
+        vertex_mvNormal = mvNormal;
+        
+        vec3 gouraud = vec3(0.0, 0.0, 0.0);
+
+        if(shading.x == 1.0){
+            float ka = 0.03;
+            float kd = 1.0;
+            float ks = 1.0;
+            //float ka = 0.1;
+            //float kd = 0.6;
+            //float ks = 0.3;
+            
+            vec3 light[3];
+            vec3 lightColor[3];
+            light[0] = vec3(30, 20, -25);
+            light[1] = vec3(-30, 20, -25);
+            light[2] = vec3(0, 20, -25);
+            lightColor[0] = vec3(1.0, 0.0, 0.0);
+            lightColor[1] = vec3(0.0, 1.0, 0.0);
+            lightColor[2] = vec3(0.0, 0.0, 1.0);
+
+
+            for(int i = 0; i < 3; i++){
+                vec3 V = -normalize(mvVertex);
+                vec3 N = normalize(mvNormal);
+                vec3 L = normalize(light[i] - mvVertex);
+                vec3 H = normalize(L+V);
+
+                vec3 ambient = lightColor[i] * ka * aFrontColor;
+                float cos = max(dot(L,N), 0.0);
+                vec3 diffuse = lightColor[i] * kd * aFrontColor * cos;
+                float cosAlpha = max(dot(H,N), 0.0);
+                vec3 specular = lightColor[i] * ks * pow(cosAlpha, 16.0);
+
+                gouraud += (ambient + diffuse + specular);
+            }
+            //vec4 fragcolor_tmp =  vec4(aFrontColor.rgb, 1.0);
+            //fragcolor = fragcolor_tmp * vec4(gouraud, 1.0);
+            fragcolor = vec4(gouraud, 1.0);
+        }
+
+        //fragcolor = vec4(aFrontColor, 1.0);
+        //gl_Position =  uPMatrix * uMVMatrix * vec4(aVertexPosition.x, aVertexPosition.y, aVertexPosition.z, 1.0);
+    }
+</script>
+
+<script type="text/javascript">
+    // common variables
+    var gl;
+    var shaderProgram;
+    var numOfThings = 1;
+    var model_name = ['Teapot', 'Easter', 'Easter', 'Teapot'];
+
+    var modelViewMatrix = [];
+    var projectionMatirx = [];
+    var shading = [];
+    for(var i = 0; i < numOfThings; i++) {
+        modelViewMatrix.push(mat4.create());
+        projectionMatirx.push(mat4.create());
+        shading.push(vec3.create());
+    }
+
+    var translateMatrix = [[0, 0, -40], [0, 0, -80], [20, 0, -80], [40, 0, -80]];
+    var rotateMatirx = [[0, 1, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0]];
+    var scaleMatrix = [[1,1,1], [20,20,20], [20,20,20], [1, 1, 1]];
+    var shading = 0;
+
+    /*window.setInterval(() => {
+        translateMatrix[0][0] += 10
+    }, 3000)*/
+
+    var teapotVertexPositionBuffer;
+    var teapotVertexNormalBuffer;
+    var teapotVertexFrontColorBuffer;
+
+    var teapotAngle = 180;
+    var lastTime    = 0;
+
+    var VertexPositionBuffer = [];
+    var VertexNormalBuffer = [];
+    var VertexFrontColorBuffer = [];
+
+    function initGL(canvas) {
+        try {
+            gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+            gl.viewportWidth  = canvas.width;
+            gl.viewportHeight = canvas.height;
+        } 
+        catch (e) {
+        }
+
+        if (!gl) {
+            alert("Could not initialise WebGL, sorry :-(");
+        }
+
+        if(!gl.getExtension('OES_standard_derivatives')) {
+    		throw 'extension not support';
+    	}
+    }
+
+    function getShader(gl, id) {
+        var shaderScript = document.getElementById(id);
+        if (!shaderScript) {
+            return null;
+        }
+
+        var shaderSource = "";
+        var k = shaderScript.firstChild;
+        while (k) {
+            if (k.nodeType == 3) {
+                shaderSource += k.textContent;
+            }
+
+            k = k.nextSibling;
+        }
+
+        var shader;
+        if (shaderScript.type == "fragment") {
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+        } 
+        else if (shaderScript.type == "vertex") {
+            shader = gl.createShader(gl.VERTEX_SHADER);
+        } 
+        else {
+            return null;
+        }
+
+        gl.shaderSource(shader, shaderSource);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(shader));
+            return null;
+        }
+
+        return shader;
+    }
+
+    function initShaders() {
+        var fragmentShader = getShader(gl, "fragmentShader");
+        var vertexShader   = getShader(gl, "vertexShader");
+
+        shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            alert("Could not initialise shaders");
+        }
+
+        gl.useProgram(shaderProgram);
+        //你有幾個attibute，這邊就要寫幾個
+        shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+        gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+        shaderProgram.vertexFrontColorAttribute = gl.getAttribLocation(shaderProgram, "aFrontColor");
+        gl.enableVertexAttribArray(shaderProgram.vertexFrontColorAttribute);
+        shaderProgram.vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexNormal");
+        gl.enableVertexAttribArray(shaderProgram.vertexNormalAttribute);
+
+        shaderProgram.pMatrixUniform  = gl.getUniformLocation(shaderProgram, "uPMatrix");
+        shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+        shaderProgram.shading         = gl.getUniformLocation(shaderProgram, "shading");
+    }
+
+
+    function setMatrixUniforms(i) {
+        gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, projectionMatirx[i]);
+        gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, modelViewMatrix[i]);
+        gl.uniform3fv(shaderProgram.shading, [shading, 0, 0]); //設定shading的地方
+    }
+
+    function degToRad(degrees) {
+        return degrees * Math.PI / 180;
+    }
+
+// Buffer starts
+    function handleLoadedThing(Data, idx){
+        VertexPositionBuffer[idx] = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, VertexPositionBuffer[idx]);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(Data.vertexPositions), gl.STATIC_DRAW);
+        VertexPositionBuffer[idx].itemSize = 3;
+        VertexPositionBuffer[idx].numItems = Data.vertexPositions.length / 3;
+
+        VertexNormalBuffer[idx] = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, VertexNormalBuffer[idx]);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(Data.vertexNormals), gl.STATIC_DRAW);
+        VertexNormalBuffer[idx].itemSize = 3;
+        VertexNormalBuffer[idx].numItems = Data.vertexNormals.length / 3;
+
+        VertexFrontColorBuffer[idx] = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, VertexFrontColorBuffer[idx]);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(Data.vertexFrontcolors), gl.STATIC_DRAW);
+        VertexFrontColorBuffer[idx].itemSize = 3;
+        VertexFrontColorBuffer[idx].numItems = Data.vertexFrontcolors.length / 3;
+    }
+
+    function handleLoadedTeapot(teapotData) {
+        teapotVertexPositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexPositions), gl.STATIC_DRAW);
+        teapotVertexPositionBuffer.itemSize = 3;
+        teapotVertexPositionBuffer.numItems = teapotData.vertexPositions.length / 3;
+
+        teapotVertexNormalBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexNormals), gl.STATIC_DRAW);
+        teapotVertexNormalBuffer.itemSize = 3;
+        teapotVertexNormalBuffer.numItems = teapotData.vertexNormals.length / 3;
+        //
+        teapotVertexFrontColorBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexFrontColorBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexFrontcolors), gl.STATIC_DRAW);
+        teapotVertexFrontColorBuffer.itemSize = 3;
+        teapotVertexFrontColorBuffer.numItems = teapotData.vertexFrontcolors.length / 3;
+    }
+// Buffer ends
+
+// Load things starts
+    // new hua starts - 更改loading functions -> 嘗試加入三個東西
+    function loadThing(name, idx) {
+        var request = new XMLHttpRequest();
+        request.open("GET", "./model/" + name + ".json");
+        request.onreadystatechange = function () {
+            if (request.readyState == 4) {
+                handleLoadedThing(JSON.parse(request.responseText), idx);
+            }
+        }
+        request.send();
+    }
+
+
+    function drawScene() {
+        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        // new hua starts -> 嘗試加入三個東西
+        for(var i = 0; i < numOfThings; i++){
+            if(VertexPositionBuffer[i] == null || VertexNormalBuffer[i] == null || VertexFrontColorBuffer[i] == null){
+                return;
+            }
+            
+            mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100, projectionMatirx[i]);//最後面要放projection matrix
+            mat4.identity(modelViewMatrix[i]);// model view matrix
+            mat4.translate(modelViewMatrix[i], translateMatrix[i]);//translate, z軸要設定在負的地方才會看得到，因為預設是看往(0,0,-1)，因此是設負的
+            mat4.rotate(modelViewMatrix[i], degToRad(teapotAngle), rotateMatirx[i]);//rotation：照著哪個軸心轉: 分別是x,y,z
+            mat4.scale(modelViewMatrix[i], scaleMatrix[i]); 
+            //mat4.shear(modelViewMatrix[i], degToRad(1));
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, VertexPositionBuffer[i]);
+            gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, VertexPositionBuffer[i].itemSize, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, VertexFrontColorBuffer[i]);
+            gl.vertexAttribPointer(shaderProgram.vertexFrontColorAttribute, VertexFrontColorBuffer[i].itemSize, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, VertexNormalBuffer[i]);
+            gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, VertexNormalBuffer[i].itemSize, gl.FLOAT, false, 0, 0);
+
+            setMatrixUniforms(i);
+            gl.drawArrays(gl.TRIANGLES, 0, VertexPositionBuffer[i].numItems);            
+        }
+        // new hua ends
+
+        
+
+        /*
+        // origin starts ------------>
+        if (teapotVertexPositionBuffer   == null || 
+            teapotVertexNormalBuffer     == null || 
+            teapotVertexFrontColorBuffer == null) {
+            return;
+        }
+        mat4.perspective(20, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);// Setup Projection Matrix,  45:相機一開始看出去的寬度是45度角
+
+        
+        //Setup Model-View Matrix: 是由下往上執行，雖然程式是由上往下寫，也就是說會先執行rotate->translate
+        
+        mat4.identity(mvMatrix);//單位矩陣
+        mat4.translate(mvMatrix, [0, 0, -80]);//translate, z軸要設定在負的地方才會看得到，因為預設是看往(0,0,-1)，因此是設負的
+        mat4.rotate(mvMatrix, degToRad(teapotAngle), [1, 0, 0]);//rotation：照著哪個軸心轉: 分別是x,y,z
+        mat4.scale(mvMatrix, [10,10,10]);
+        //mat4.shear(mvMatrix, degToRad(20));
+
+
+        // 這一行很重要，打這行shader才會讀到你更改的資料
+        setMatrixUniforms();
+
+        // Setup teapot position data
+        //剛剛做好的資料傳進buffer裡面，像是我們剛才設定的vextex的position等等之類的
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer);
+        gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, teapotVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+        // Setup teapot front color data
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexFrontColorBuffer);
+        gl.vertexAttribPointer(shaderProgram.vertexFrontColorAttribute, teapotVertexFrontColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+        //今天新增的第三個，vertexNormal
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer);
+        gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, teapotVertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+        //0: 從原點開始畫，teapotVertexPositionBuffer.numItems總共要畫幾個item
+        //要換model，要改這邊“teapotVertexPositionBuffer“，以及前面bindbuffer的部分也要重新bind
+        //這行要寫才會把東西畫出來
+        gl.drawArrays(gl.TRIANGLES, 0, teapotVertexPositionBuffer.numItems); 
+        // origin ends <------------
+        */
+        
+    }
+
+    function animate() {
+        var timeNow = new Date().getTime();
+        if (lastTime != 0) {
+            var elapsed = timeNow - lastTime;
+            teapotAngle += 0.10 * elapsed;
+        }
+        
+        lastTime = timeNow;
+    }
+
+    function tick() {
+        requestAnimFrame(tick);//告訴瀏覽器我們現在要畫圖，寫tick進去就是無限輪迴tick這個function
+        drawScene();//重點
+        animate();
+    }
+
+    function webGLStart() {
+        var canvas = document.getElementById("ICG-canvas");
+        initGL(canvas);
+        initShaders();
+
+        for(var i = 0; i < numOfThings; i++){
+            loadThing(model_name[i], i);
+        }
+
+        gl.clearColor(0.0, 0.2, 0.2, 1.0);
+        gl.enable(gl.DEPTH_TEST);
+
+        tick();
+    }
+
+    mat4.shear=function(a, b)
+    {
+        var tmp = mat4.create();
+        mat4.identity(tmp);
+        if(Math.sin(b) == 1)
+            tmp[1] = 0;
+        else
+            tmp[1] = 1/Math.tan(b);
+        mat4.multiply(a, tmp);
+    }
+
+    function change_shading() {
+        shading = 1;
+        for (var i = 3; i < 6; i++) {
+            if (document.getElementById(i).checked) {
+                shading = i - 3
+                break
+            }
+        }
+    }
+</script>
+</head>
+
+<body onload="webGLStart();">
+    <canvas id="ICG-canvas" style="border: none;" width="1200" height="600"></canvas>
+    <br/>
+
+    <form onchange="">
+        Model<br>
+        <input type="radio" id="0" name="model" checked> Csie
+        <input type="radio" id="1" name="model"> Kangaroo
+        <input type="radio" id="2" name="model"> Easter
+    </form>
+    <form onchange="change_shading()">
+        Shading<br>
+        <input type="radio" id="3" name="shading" checked> Flat Shading
+        <input type="radio" id="4" name="shading"> Gouraud Shading
+        <input type="radio" id="5" name="shading"> Phong Shading
+    </form>
+
+</body>
+</html>
