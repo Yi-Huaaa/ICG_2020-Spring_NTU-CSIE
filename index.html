@@ -5,30 +5,28 @@ program會再把東西存到attribute
 shader會讀attribute裡的東西
 然後去進行drawarray的動作
 -------------------------------------------
-如果你要創造兩個models，那handle那邊就要創在不同的buffer讀不同的資料進來
-bindbuffer都要另外開給其他幾個models
--------------------------------------------
-DO:
-先畫出三種東西import進去
-三個東西加上燈
-三個東西加上gouraud shader
-三個東西加上第二種 shader
-三種東西加上第三種 shader
-Implement Flat, Gouraud, and Phong shading 
--------------------------------------------
 Bonus:
-1. 五樣東西
-2. 五種燈光：調整燈光的按鈕
-3. texture mapping （只有茶壺可以用）
-4. Shiness -> 姜昆易做的
-5. animation shading
-6. clipping -> 還不知道是啥
-7. ray tracing
+*** 1. 五樣東西
+*** 2. 五種燈光：調整燈光的按鈕
+線條感的model不知道怎麼做或者是點狀的 中間簍空
+*** 4. Shiness 作法：改動 vec3 specular = lightColor[i] * ks * pow(cosAlpha, 16.0);最後面的數字，數字越小亮度越高
+加上bottoom QQ 拉霸（滾滾
+/
+拉霸：基礎，第四盞燈光，shiness，Reflection，黃金model，teapot texture mapping（這要做要跟不要兩個案紐）
+/
+萬花筒效果
+*** 黃金model:  fragcolor = vec4(gouraud, 1.0); 最後一個數字改的超級小就會像是黃金色
+*** 3. texture mapping （只有茶壺可以用）//阿肥有
+放兩隻袋鼠-> 正常袋鼠、金屬袋鼠
+*** 8. 做 Reflection 第一份講義p.51
+** 6. clipping，搬移clipping window （下週再做）
 -------
 Demo 要求1: 有可能要你把兩個不重疊的東西重疊，設定在同一個位置就好 (part of "translate")
 Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
-
-
+-----
+Ref: 
+1. canvas邊框：https://www.wibibi.com/info.php?tid=89
+上面這個網址還可以改bottom的顏色
 -->
 <html>
 
@@ -39,11 +37,6 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
 <script type="text/javascript" src="./js/glMatrix-0.9.5.min.js"></script>
 <script type="text/javascript" src="./js/webgl-utils.js"></script>
 
-<!-- 
-    TODO HERE: 
-    modify fragment shader or write another one
-    to implement flat, gouraud and phong shading
- -->
 <script id="fragmentShader" type="fragment">
 	#extension GL_OES_standard_derivatives : enable
     precision highp float;
@@ -55,8 +48,10 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
     varying vec3 vertex_aVertexNormal;
     varying mat4 vertex_uPMatrix;
     varying mat4 vertex_uMVMatrix;
-    varying vec3 vertex_shading;
     varying vec3 vertex_mvNormal;
+    varying vec3 vertex_shading;
+    varying vec3 vertex_shiness;
+
 
 
     void main(void) {
@@ -66,13 +61,14 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
         mat4 uPMatrix = vertex_uPMatrix;
         mat4 uMVMatrix = vertex_uMVMatrix;
         float shading = vertex_shading.x; // only extract the first value
+        float shiness = vertex_shiness.x; // only extract the first value
 
         vec3 gouraud = vec3(0.0, 0.0, 0.0);
         vec3 finalColor = vec3(0.0, 0.0, 0.0);
 
-        float ka = 0.1;
-        float kd = 0.6;
-        float ks = 0.3;
+        float ka = 0.1;//0.2
+        float kd = 0.6;//0.6
+        float ks = 0.3;//0.2
 
         vec3 mvVertex = (uMVMatrix * vec4(aVertexPosition, 1.0)).xyz;
         mat3 normalMVMatrix = mat3(uMVMatrix);
@@ -97,7 +93,7 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
             if(shading == 0.0){ //flat shading
                 N = normalize(cross(dFdx(-mvVertex), dFdy(-mvVertex)));
             }
-            else{//phong shading
+            else{ //phong shading
                 N = normalize(aVertexNormal);
             } 
             vec3 V = -normalize(mvVertex);
@@ -108,7 +104,7 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
             float cos = max(dot(L, N), 0.0);
             vec3 diffuse = lightColor[i] * kd * aFrontColor * cos;
             float cosAlpha = max(dot(H, N), 0.0);
-            vec3 specular = lightColor[i] * ks * pow(cosAlpha, 16.0);
+            vec3 specular = lightColor[i] * ks * pow(cosAlpha, shiness);
             //gouraud += (ambient + diffuse + specular);
             finalColor += (ambient + diffuse + specular);
         }
@@ -117,17 +113,7 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
     }
 </script>
 
-<!-- 
-    TODO HERE:
-    modify vertex shader or write another one
-    to implement flat, gouraud and phong shading
 
-    NOTE:
-    if you want to write bonus part (texture mapping),
-    only Teapot.json has extra attribute "vertexTextureCoords"
-    which is used for texture mappping.
-    attribute: 每次傳進來的東西是不一樣的
- -->
 <script id="vertexShader" type="vertex">
     attribute vec3 aVertexPosition;
     attribute vec3 aFrontColor; //就是object的顏色
@@ -136,6 +122,7 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
     uniform mat4 uMVMatrix;
     uniform mat4 uPMatrix;
     uniform vec3 shading;
+    uniform vec3 shiness;
 
 	varying vec4 fragcolor;
 
@@ -144,8 +131,9 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
     varying vec3 vertex_aVertexNormal;
     varying mat4 vertex_uPMatrix;
     varying mat4 vertex_uMVMatrix;
-    varying vec3 vertex_shading;
     varying vec3 vertex_mvNormal;
+    varying vec3 vertex_shading;
+    varying vec3 vertex_shiness;
 
     void main(void) {
 
@@ -155,6 +143,7 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
         vertex_uPMatrix = uPMatrix;
         vertex_uMVMatrix = uMVMatrix;
         vertex_shading = shading;
+        vertex_shiness = shiness;
         
 
 
@@ -168,23 +157,22 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
 
         if(shading.x == 1.0){
             float ka = 0.03;
-            float kd = 1.0;
-            float ks = 1.0;
-            //float ka = 0.1;
-            //float kd = 0.6;
-            //float ks = 0.3;
+            float kd = 0.8;
+            float ks = 0.8;
             
-            vec3 light[3];
-            vec3 lightColor[3];
+            vec3 light[4];
+            vec3 lightColor[4];
             light[0] = vec3(30, 20, -25);
             light[1] = vec3(-30, 20, -25);
             light[2] = vec3(0, 20, -25);
+            light[3] = vec3(0, 0, -60);
             lightColor[0] = vec3(1.0, 0.0, 0.0);
             lightColor[1] = vec3(0.0, 1.0, 0.0);
             lightColor[2] = vec3(0.0, 0.0, 1.0);
+            lightColor[3] = vec3(0.8, 0.8, 0.8);
 
 
-            for(int i = 0; i < 3; i++){
+            for(int i = 0; i < 4; i++){ //燈光數目
                 vec3 V = -normalize(mvVertex);
                 vec3 N = normalize(mvNormal);
                 vec3 L = normalize(light[i] - mvVertex);
@@ -194,13 +182,11 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
                 float cos = max(dot(L,N), 0.0);
                 vec3 diffuse = lightColor[i] * kd * aFrontColor * cos;
                 float cosAlpha = max(dot(H,N), 0.0);
-                vec3 specular = lightColor[i] * ks * pow(cosAlpha, 16.0);
+                vec3 specular = lightColor[i] * ks * pow(cosAlpha, shiness.x); 
 
                 gouraud += (ambient + diffuse + specular);
             }
-            //vec4 fragcolor_tmp =  vec4(aFrontColor.rgb, 1.0);
-            //fragcolor = fragcolor_tmp * vec4(gouraud, 1.0);
-            fragcolor = vec4(gouraud, 1.0);
+            fragcolor = vec4(gouraud, 1.0);//最後一個直好像是透明度，數字越小會有黃金的感覺
         }
 
         //fragcolor = vec4(aFrontColor, 1.0);
@@ -218,16 +204,26 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
     var modelViewMatrix = [];
     var projectionMatirx = [];
     var shading = [];
+    var shiness = [];
+
     for(var i = 0; i < numOfThings; i++) {
         modelViewMatrix.push(mat4.create());
         projectionMatirx.push(mat4.create());
         shading.push(vec3.create());
+        shiness.push(vec3.create());
     }
 
-    var translateMatrix = [[-25, 10, -40], [0, 0, -80], [30, 0, -80], [-50, -20, -40]];
+    var translateMinMaxBound = [[-20, 20], [-20, 20], [-20, 20], [-20, 20]];
+    var rotateMinMaxBound = [[-1, 1], [-1, 1], [-1, 1], [-1, 1]];
+    var scaleMinMaxBound = [[0.1, 1.5], [10, 25], [30, 45], [20, 30]];
+    var shearMinMaxBound = [[-1, 1], [-1, 1], [-1, 1], [-1, 1]];
+    
+    var translateMatrix = [[-15, 10, -40], [25, 0, -80], [60, 0, -80], [-50, -10, -40]];
     var rotateMatirx = [[0, 1, 0], [1, 0, 0], [1, 0, 0], [0, 0, 1]];
-    var scaleMatrix = [[0.5,0.5,0.5], [20,20,20], [40,40,40], [50,50,50]];
+    var scaleMatrix = [[0.5,0.5,0.5], [20,20,20], [40,40,40], [25,25,25]];
+    var shearMatrix = [[0,0,0],[0,0,0],[0,0,0],[0,0,0]];
     var shading = 0;
+    var shiness = 16.0;//最大範圍從1~2000
 
     /*window.setInterval(() => {
         translateMatrix[0][0] += 10
@@ -325,6 +321,7 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
         shaderProgram.pMatrixUniform  = gl.getUniformLocation(shaderProgram, "uPMatrix");
         shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
         shaderProgram.shading         = gl.getUniformLocation(shaderProgram, "shading");
+       	shaderProgram.shiness         = gl.getUniformLocation(shaderProgram, "shiness");
     }
 
 
@@ -332,6 +329,7 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
         gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, projectionMatirx[i]);
         gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, modelViewMatrix[i]);
         gl.uniform3fv(shaderProgram.shading, [shading, 0, 0]); //設定shading的地方
+        gl.uniform3fv(shaderProgram.shiness, [shiness, 0, 0]);
     }
 
     function degToRad(degrees) {
@@ -381,7 +379,6 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
 // Buffer ends
 
 // Load things starts
-    // new hua starts - 更改loading functions -> 嘗試加入三個東西
     function loadThing(name, idx) {
         var request = new XMLHttpRequest();
         request.open("GET", "./model/" + name + ".json");
@@ -408,7 +405,7 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
             mat4.translate(modelViewMatrix[i], translateMatrix[i]);//translate, z軸要設定在負的地方才會看得到，因為預設是看往(0,0,-1)，因此是設負的
             mat4.rotate(modelViewMatrix[i], degToRad(teapotAngle), rotateMatirx[i]);//rotation：照著哪個軸心轉: 分別是x,y,z
             mat4.scale(modelViewMatrix[i], scaleMatrix[i]); 
-            //mat4.shear(modelViewMatrix[i], degToRad(1));
+            //mat4.shear(modelViewMatrix[i], degToRad(10000));
 
             gl.bindBuffer(gl.ARRAY_BUFFER, VertexPositionBuffer[i]);
             gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, VertexPositionBuffer[i].itemSize, gl.FLOAT, false, 0, 0);
@@ -440,6 +437,15 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
         animate();
     }
 
+	var input_translate;
+	var input_scale;
+	var input_rotate;
+	var input_shear;
+	var input_model = [];
+	//var input_shading = [];
+
+	var input_shiness;
+
     function webGLStart() {
         var canvas = document.getElementById("ICG-canvas");
         initGL(canvas);
@@ -451,12 +457,87 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
 
         gl.clearColor(0.0, 0.2, 0.2, 1.0);
         gl.enable(gl.DEPTH_TEST);
+		
+		input_translate = document.getElementById('translate');
+		input_translate.onclick = change_transformation;
+		input_scale = document.getElementById('scale');
+		input_scale.onclick = change_transformation;
+		input_rotate = document.getElementById('rotate');
+		input_rotate.onclick = change_transformation;
+		input_shear = document.getElementById('shear');
+		input_shear.onclick = change_transformation;
 
+		input_shiness = document.getElementById('shiness');
+		input_shiness.onclick = change_shiness;
+
+		for(var i = 0; i < numOfThings; i++)
+		{
+			input_model.push(document.getElementById(i));
+			input_model[i].onclick = model_chg;
+		}
         tick();
     }
+	function change_transformation()
+	{
+		for(var i = 0; i < numOfThings; i++){
+			if(input_model[i].checked) {
+				translateMatrix[i][1] = parseFloat(input_translate.value);
+				
+				scaleMatrix[i][0] = parseFloat(input_scale.value);
+				scaleMatrix[i][1] = parseFloat(input_scale.value);
+				scaleMatrix[i][2] = parseFloat(input_scale.value);
+				
+				rotateMatirx[i][1] = parseFloat(input_rotate.value);
 
+				shearMatrix[i][1] = parseFloat(input_shear.value);
+			}
+		}
+	}
+    function change_shading() {
+        shading = 1;
+        for (var i = 4; i < 7; i++) {
+            if (document.getElementById(i).checked) {
+                shading = i - 4
+                break
+            }
+        }
+    }
+    function change_shiness(){
+    	for( var i = 0; i < numOfThings; i++){
+    		shiness = parseFloat(input_shiness.value);
+    	}
+    }
+	function model_chg(){
+		for(var i = 0; i < numOfThings; i++){
+			if(input_model[i].checked){
+				//transformation
+				input_translate.value = translateMatrix[i][1];
+				input_scale.value = scaleMatrix[i][0];
+				input_rotate.value = rotateMatirx[i][1];
+				input_shear.value = shearMatrix[i][1];
+
+				input_translate.min = translateMinMaxBound[i][0];
+				input_translate.max = translateMinMaxBound[i][1];
+				input_scale.min = scaleMinMaxBound[i][0];
+				input_scale.max = scaleMinMaxBound[i][1];
+				input_rotate.min = rotateMinMaxBound[i][0];
+				input_rotate.max = rotateMinMaxBound[i][1];
+				input_shear.min = shearMinMaxBound[i][0];
+				input_shear.max = shearMinMaxBound[i][1];
+
+				//shiness
+				input_shiness.value = shiness[i];
+				input_shiness.max = 2000.0;
+				input_shiness.min = 1.0;
+
+				break;
+			}
+		}
+
+	}
     mat4.shear=function(a, b)
     {
+        //model view degree
         var tmp = mat4.create();
         mat4.identity(tmp);
         if(Math.sin(b) == 1)
@@ -465,65 +546,65 @@ Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
             tmp[1] = 1/Math.tan(b);
         mat4.multiply(a, tmp);
     }
-    function change_model(){
-        model = 1;
-    }
-
-    function change_shading() {
-        shading = 1;
-        for (var i = 3; i < 6; i++) {
-            if (document.getElementById(i).checked) {
-                shading = i - 3
-                break
-            }
-        }
-    }
-    function change_translate(){
-    	
-    }
-
 
 </script>
 </head>
 
 <body onload="webGLStart();">
-    <canvas id="ICG-canvas" style="border: none;" width="1420" height="550"></canvas>
+    <canvas id="ICG-canvas" style="border-width:10px;border-style:outset;border-color:#009400;padding:5px;background-color:orange;margin-right:5px;" width="1400" height="500"></canvas>
+    <br/>
     <br/>
 
-    <form onchange="">
+    <form onchange="model_chg()">
         Model<br>
-        <input type="radio" id="0" name="model" checked> Csie
-        <input type="radio" id="1" name="model"> Kangaroo
-        <input type="radio" id="2" name="model"> Easter
+        <input type="radio" id="0" name="model" checked> Teapot
+        <input type="radio" id="1" name="model"> Easter
+        <input type="radio" id="2" name="model"> Chruch
+        <input type="radio" id="3" name="model"> Kangaroo
     </form>
     <form onchange="change_shading()">
         Shading<br>
-        <input type="radio" id="3" name="shading" checked> Flat Shading
-        <input type="radio" id="4" name="shading"> Gouraud Shading
-        <input type="radio" id="5" name="shading"> Phong Shading
+        <input type="radio" id="4" name="shading" checked> Flat Shading
+        <input type="radio" id="5" name="shading"> Gouraud Shading
+        <input type="radio" id="6" name="shading"> Phong Shading
     </form>
-    <fieldset>
-        <legend>Transformation</legend>
-        <form onchange="change_translate()">
-	        <label for="translate">Translate</label>
-	        <input type="range" id="translate" name="translate" style="width:200px;"
-	            min="-10" max="10" value="0" step="0.1"/>
-    	</form>
+    <form>
+        Reflection<br>
+        <input type="radio" id="Reflection_yes" name="Reflection_yes"> Reflection x axil
+        <input type="radio" id="Reflection_no" name="Reflection_no" checked> Normally
+    </form>
+	<fieldset>
+		<legend>Transformation</legend>
+		<label for="translate">Translate</label>
+		<input type="range" id="translate" name="translate" style="width:400px;"
+			min="-10" max="10" value="0" step="0.1"/>
 
-        <label for="scale">Scale</label>
-        <input type="range" id="scale" name="scale" style="width:200px;"
-            min="-10" max="10" value="0" step="0.1"/>
-        <br>
-        <br>
+		<label for="scale">Scale</label>
+		<input type="range" id="scale" name="scale" style="width:400px;"
+			min="-10" max="10" value="0" step="0.1"/>
+		<br>
+		<br>
 
-        <label for="rotate">Rotate&nbsp;&nbsp;&nbsp;&nbsp;</label>
-        <input type="range" id="rotate" name="rotate" style="width:200px;"
-            min="-180" max="180" value="0" step="0.1"/>
+		<label for="rotate">Rotate&nbsp;&nbsp;&nbsp;&nbsp;</label>
+		<input type="range" id="rotate" name="rotate" style="width:400px;"
+			min="-180" max="180" value="0" step="0.1"/>
 
-        <label for="shear">Shear</label>
-        <input type="range" id="shear" name="shear" style="width:200px;"
-            min="45" max="135" value="90" step="0.1"/>
-    </fieldset>
+		<label for="shear">Shear</label>
+		<input type="range" id="shear" name="shear" style="width:400px;"
+			min="45" max="135" value="90" step="0.1"/>
+		<br>
+		<br>
+
+		<label for="shiness">Shiness</label>
+		<input type="range" id="shiness" name="shiness" style="width:400px;"
+			min="10" max="1600" value="16" step="5"/>
+
+		<label for="gloden">Gloden</label>
+		<input type="range" id="gloden" name="gloden" style="width:400px;"
+			min="45" max="135" value="90" step="0.1"/>
+
+
+	</fieldset>
 
 </body>
 </html>
