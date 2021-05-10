@@ -1,7 +1,7 @@
 # 2021-Spring-NTU_ICG-hw
 Professor: M Ouhyoung  
 Class: Interactive Computer Graphics, 2021, Spring.
-#HW
+# HW Requirement
 * Implemetation of three different Shadings with Phong model:
   1. Flat Shading 
   2. Gouraud Shading
