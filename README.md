@@ -1,5 +1,5 @@
 # 2021-Spring-NTU_ICG-hw
-Professor: M Ouhyoung
+Professor: M Ouhyoung \\
 Class: Interactive Computer Graphics, 2021, Spring.
 #HW
 * Implemetation of three different Shadings with Phong model:
