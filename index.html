@@ -5,20 +5,19 @@ program會再把東西存到attribute
 shader會讀attribute裡的東西
 然後去進行drawarray的動作
 -------------------------------------------
+done_bonus:
+1. Shiness 作法：改動 vec3 specular = lightColor[i] * ks * pow(cosAlpha, 16.0);最後面的數字，數字越小亮度越高
+2. 黃金model:  fragcolor = vec4(gouraud, 1.0); 最後一個數字改的超級小就會像是黃金色
+/
 Bonus:
 *** 1. 五樣東西
 *** 2. 五種燈光：調整燈光的按鈕
-線條感的model不知道怎麼做或者是點狀的 中間簍空
-*** 4. Shiness 作法：改動 vec3 specular = lightColor[i] * ks * pow(cosAlpha, 16.0);最後面的數字，數字越小亮度越高
-加上bottoom QQ 拉霸（滾滾
 /
-拉霸：基礎，第四盞燈光，shiness，Reflection，黃金model，teapot texture mapping（這要做要跟不要兩個案紐）
-/
-萬花筒效果
-*** 黃金model:  fragcolor = vec4(gouraud, 1.0); 最後一個數字改的超級小就會像是黃金色
-*** 3. texture mapping （只有茶壺可以用）//阿肥有
+*** 3. texture mapping （只有茶壺可以用）
 放兩隻袋鼠-> 正常袋鼠、金屬袋鼠
 *** 8. 做 Reflection 第一份講義p.51
+/
+線條感的model不知道怎麼做或者是點狀的 中間簍空
 ** 6. clipping，搬移clipping window （下週再做）
 -------
 Demo 要求1: 有可能要你把兩個不重疊的東西重疊，設定在同一個位置就好 (part of "translate")
@@ -37,6 +36,7 @@ Ref:
 <script type="text/javascript" src="./js/glMatrix-0.9.5.min.js"></script>
 <script type="text/javascript" src="./js/webgl-utils.js"></script>
 
+
 <script id="fragmentShader" type="fragment">
 	#extension GL_OES_standard_derivatives : enable
     precision highp float;
@@ -52,8 +52,7 @@ Ref:
     varying vec3 vertex_shading;
     varying vec3 vertex_shiness;
     varying vec3 vertex_gloden;
-
-
+    varying vec3 vertex_reflection;
 
     void main(void) {
         vec3 aVertexPosition = vertex_aVertexPosition;
@@ -63,7 +62,8 @@ Ref:
         mat4 uMVMatrix = vertex_uMVMatrix;
         float shading = vertex_shading.x; // only extract the first value
         float shiness = vertex_shiness.x; // only extract the first value
-        float gloden = vertex_gloden.x;; //only extract the first value
+        float gloden = vertex_gloden.x;   //only extract the first value
+        float reflection = vertex_reflection.x; //only extract the first value
 
         vec3 gouraud = vec3(0.0, 0.0, 0.0);
         vec3 finalColor = vec3(0.0, 0.0, 0.0);
@@ -78,20 +78,34 @@ Ref:
         vec3 N = vec3(0.0, 0.0, 0.0);//N: Normal
 
 
-        vec3 light[3];
-        vec3 lightColor[3];
-        light[0] = vec3(0, 40, -40);
-        light[1] = vec3(0, -40, -40);
-        light[2] = vec3(40, 0, -40);
+        vec3 light[6];
+        vec3 lightColor[6];
+        light[0] = vec3(0.0, 40, -40);
+        light[1] = vec3(0.0, -40, -40);
+        light[2] = vec3(40.0, 0.0, -40);
+        light[3] = vec3(-10.0, 10, -40);
+        light[4] = vec3(-50.0, 10, 40);
+        light[5] = vec3(-40.0, -5, -40);
         lightColor[0] = vec3(1.5, 0.0, 0.0);
         lightColor[1] = vec3(0.0, 1.5, 0.0);
         lightColor[2] = vec3(0.0, 0.0, 1.0);
+        lightColor[3] = vec3(1.0, 1.0, 1.0);
+        lightColor[4] = vec3(0.20, 0.0, 0.0);
+        lightColor[5] = vec3(0.78, 0.78, 0.78);
+
+        if(reflection == 1.0){
+        	for(int i = 0; i < 5; i++){
+        		light[i].x = -light[i].x;
+        		light[i].y = -light[i].y;
+        	}
+    	}
+
         if (shading == 1.0){ //gouraud shading
             gl_FragColor = fragcolor;
             return;
         }
 
-        for(int i = 0; i < 3; i++){
+        for(int i = 0; i < 6; i++){
             if(shading == 0.0){ //flat shading
                 N = normalize(cross(dFdx(-mvVertex), dFdy(-mvVertex)));
             }
@@ -126,6 +140,7 @@ Ref:
     uniform vec3 shading;
     uniform vec3 shiness;
     uniform vec3 gloden;
+    uniform vec3 reflection;
 
 	varying vec4 fragcolor;
 
@@ -138,6 +153,8 @@ Ref:
     varying vec3 vertex_shading;
     varying vec3 vertex_shiness;
     varying vec3 vertex_gloden;
+    varying vec3 vertex_reflection;
+
 
     void main(void) {
 
@@ -149,10 +166,14 @@ Ref:
         vertex_shading = shading;
         vertex_shiness = shiness;
         vertex_gloden = gloden;
+        vertex_reflection = reflection;
         
-
-
         gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+		
+		if(reflection.x == 1.0){
+			gl_Position.x = -gl_Position.x;
+		}        
+
         vec3 mvVertex = (uMVMatrix * vec4(aVertexPosition, 1.0)).xyz;
         mat3 normalMatrix = mat3(uMVMatrix);
         vec3 mvNormal = normalMatrix * aVertexNormal;
@@ -165,19 +186,21 @@ Ref:
             float kd = 0.8;
             float ks = 0.8;
             
-            vec3 light[4];
-            vec3 lightColor[4];
+            vec3 light[5];
+            vec3 lightColor[5];
             light[0] = vec3(30, 20, -25);
             light[1] = vec3(-30, 20, -25);
             light[2] = vec3(0, 20, -25);
-            light[3] = vec3(0, 0, -60);
+            light[3] = vec3(0, -40, 0);
+            light[4] = vec3(-50, 10, -40);
             lightColor[0] = vec3(1.0, 0.0, 0.0);
             lightColor[1] = vec3(0.0, 1.0, 0.0);
             lightColor[2] = vec3(0.0, 0.0, 1.0);
-            lightColor[3] = vec3(0.8, 0.8, 0.8);
+            lightColor[3] = vec3(0.5, 0.5, 0.5);
+            lightColor[4] = vec3(0.3, 0.3, 0.4);
 
 
-            for(int i = 0; i < 4; i++){ //燈光數目
+            for(int i = 0; i < 5; i++){ //燈光數目
                 vec3 V = -normalize(mvVertex);
                 vec3 N = normalize(mvNormal);
                 vec3 L = normalize(light[i] - mvVertex);
@@ -203,14 +226,15 @@ Ref:
     // common variables
     var gl;
     var shaderProgram;
-    var numOfThings = 4;
-    var model_name = ['Teapot', 'Easter', 'Church_s', 'Kangaroo'];
+    var numOfThings = 5;
+    var model_name = ['Teapot', 'Mig27', 'Car_road', 'Kangaroo', 'trytry'];
 
     var modelViewMatrix = [];
     var projectionMatirx = [];
     var shading = [];
     var shiness = [];
     var gloden = [];
+    var reflection = [];
 
     for(var i = 0; i < numOfThings; i++) {
         modelViewMatrix.push(mat4.create());
@@ -218,20 +242,22 @@ Ref:
         shading.push(vec3.create());
         shiness.push(vec3.create());
         gloden.push(vec3.create());
+        reflection.push(vec3.create());
     }
 
-    var translateMinMaxBound = [[-20, 20], [-20, 20], [-20, 20], [-20, 20]];
-    var rotateMinMaxBound = [[-1, 1], [-1, 1], [-1, 1], [-1, 1]];
-    var scaleMinMaxBound = [[0.1, 1.5], [10, 30], [30, 45], [20, 40]];
-    var shearMinMaxBound = [[45, 135], [45, 135], [45, 135], [45, 135]];
+    var translateMinMaxBound = [[-20, 20], [-20, 20], [-20, 20], [-20, 20], [-20, 20]];
+    var rotateMinMaxBound = [[-1, 1], [-1, 1], [-1, 1], [-1, 1], [-1, 1]];
+    var scaleMinMaxBound = [[0.1, 1.5], [10, 30], [20, 40], [20, 40], [20, 40]];
+    var shearMinMaxBound = [[45, 135], [45, 135], [45, 135],[45, 135], [45, 135]];
     
-    var translateMatrix = [[-15, 10, -40], [25, 0, -80], [60, 0, -80], [-50, -10, -40]];
-    var rotateMatirx = [[0, 1, 0], [1, 0, 0], [1, 0, 0], [0, 0, 1]];
-    var scaleMatrix = [[0.5,0.5,0.5], [20,20,20], [40,40,40], [25,25,25]];
-    var shearMatrix = [[90,0,0],[90,0,0],[90,0,0],[90,0,0]];
+    var translateMatrix = [[-10, 10, -40], [25, 0, -80], [55, -10, -60], [-50, -10, -40], [-50, 10, -40]];
+    var rotateMatirx = [[0, -1, 0], [0, 1, 1], [1, 1, 0], [0, 0, 1], [0, 0, 1]];
+    var scaleMatrix = [[0.5,0.5,0.5], [20,20,20], [20,20,20], [25,25,25], [25,25,25]];
+    var shearMatrix = [[90,0,0],[90,0,0],[90,0,0],[90,0,0], [90,0,0]];
     var shading = 0;
-    var shiness = 16.0;//最大範圍從1~2000
+    var shiness = 20.0;
     var gloden = 1.0;
+    var reflection = -1.0;
 
     /*window.setInterval(() => {
         translateMatrix[0][0] += 10
@@ -331,6 +357,7 @@ Ref:
         shaderProgram.shading         = gl.getUniformLocation(shaderProgram, "shading");
        	shaderProgram.shiness         = gl.getUniformLocation(shaderProgram, "shiness");
        	shaderProgram.gloden          = gl.getUniformLocation(shaderProgram, "gloden");
+       	shaderProgram.reflection      = gl.getUniformLocation(shaderProgram, "reflection");
     }
 
 
@@ -340,6 +367,7 @@ Ref:
         gl.uniform3fv(shaderProgram.shading, [shading, 0, 0]); //設定shading的地方
         gl.uniform3fv(shaderProgram.shiness, [shiness, 0, 0]);
         gl.uniform3fv(shaderProgram.gloden, [gloden, 0, 0]);//設定gloden 的地方
+        gl.uniform3fv(shaderProgram.reflection, [reflection, 0, 0]);//設定gloden 的地方
     }
 
     function degToRad(degrees) {
@@ -436,7 +464,7 @@ Ref:
         var timeNow = new Date().getTime();
         if (lastTime != 0) {
             var elapsed = timeNow - lastTime;
-            teapotAngle += 0.07 * elapsed;
+            teapotAngle += 0.05 * elapsed;
         }
         
         lastTime = timeNow;
@@ -457,6 +485,7 @@ Ref:
 
 	var input_shiness;
 	var input_gloden;
+	var input_reflection;
 
     function webGLStart() {
         var canvas = document.getElementById("ICG-canvas");
@@ -467,7 +496,7 @@ Ref:
             loadThing(model_name[i], i);
         }
 
-        gl.clearColor(0.0, 0.2, 0.2, 1.0);
+        gl.clearColor(0.2, 0.4, 0.2, 0.8);
         gl.enable(gl.DEPTH_TEST);
 		
 		input_translate = document.getElementById('translate');
@@ -484,6 +513,9 @@ Ref:
 
 		input_gloden = document.getElementById('gloden');
 		input_gloden.onclick = change_gloden;
+
+		input_reflection = document.getElementById('reflection');
+		input_reflection.onclick = change_reflection;
 
 		for(var i = 0; i < numOfThings; i++)
 		{
@@ -510,9 +542,9 @@ Ref:
 	}
     function change_shading() {
         shading = 1;
-        for (var i = 4; i < 7; i++) {
+        for (var i = 5; i < 8; i++) {
             if (document.getElementById(i).checked) {
-                shading = i - 4
+                shading = i - 5
                 break
             }
         }
@@ -525,6 +557,11 @@ Ref:
     function change_gloden(){
     	for( var i = 0; i < numOfThings; i++){
     		gloden = parseFloat(input_gloden.value);
+    	}    
+    }
+    function change_reflection(){ //8: normally, 9: reflection
+    	for( var i = 0; i < numOfThings; i++){
+    		reflection = parseFloat(input_reflection.value);
     	}    
     }
 	function model_chg(){
@@ -555,6 +592,11 @@ Ref:
 				input_gloden.max = 1;
 				input_gloden.min = 0.01;
 
+				//reflection
+				input_reflection.value = reflection[i];
+				input_reflection.max = 1.0;
+				input_reflection.min =-1.0;
+
 				break;
 			}
 		}
@@ -576,30 +618,26 @@ Ref:
 </head>
 
 <body onload="webGLStart();">
-    <canvas id="ICG-canvas" style="border-width:10px;border-style:outset;border-color:#009400;padding:5px;background-color:orange;margin-right:5px;" width="1400" height="500"></canvas>
+    <canvas id="ICG-canvas" style="border-width:10px;border-style:outset;border-color:#009400;padding:5px;background-color:orange;margin-right:5px;" width="1540" height="480"></canvas>
     <br/>
     <br/>
 
     <form onchange="model_chg()">
         Model<br>
         <input type="radio" id="0" name="model" checked> Teapot
-        <input type="radio" id="1" name="model"> Easter
-        <input type="radio" id="2" name="model"> Chruch
+        <input type="radio" id="1" name="model"> Mig27
+        <input type="radio" id="2" name="model"> Car_road
         <input type="radio" id="3" name="model"> Kangaroo
+        <input type="radio" id="4" name="model"> Sliver Kangaroo
     </form>
     <form onchange="change_shading()">
         Shading<br>
-        <input type="radio" id="4" name="shading" checked> Flat Shading
-        <input type="radio" id="5" name="shading"> Gouraud Shading
-        <input type="radio" id="6" name="shading"> Phong Shading
-    </form>
-    <form>
-        Reflection<br>
-        <input type="radio" id="Reflection_yes" name="Reflection_yes"> Reflection x axil
-        <input type="radio" id="Reflection_no" name="Reflection_no" checked> Normally
+        <input type="radio" id="5" name="shading" checked> Flat Shading
+        <input type="radio" id="6" name="shading"> Gouraud Shading
+        <input type="radio" id="7" name="shading"> Phong Shading
     </form>
 	<fieldset>
-		<legend>Transformation</legend>
+		<legend>Transformation for "only one" thing</legend>
 		<label for="translate">Translate</label>
 		<input type="range" id="translate" name="translate" style="width:400px;"
 			min="-10" max="10" value="0" step="0.1"/>
@@ -617,9 +655,11 @@ Ref:
 		<label for="shear">Shear</label>
 		<input type="range" id="shear" name="shear" style="width:400px;"
 			min="45" max="135" value="90" step="0.1"/>
-		<br>
-		<br>
-
+	</fieldset>
+	<br>
+	<br>
+	<fieldset>
+		<legend>Transformation for "All" the things</legend>
 		<label for="shiness">Shiness</label>
 		<input type="range" id="shiness" name="shiness" style="width:400px;"
 			min="0.01" max="20" value="18" step="0.01"/>
@@ -627,6 +667,12 @@ Ref:
 		<label for="gloden">Gloden</label>
 		<input type="range" id="gloden" name="gloden" style="width:400px;"
 			min="0.01" max="1" value="1" step="0.005"/>
+		<br>
+		<br>
+		
+		<label for="reflection">Reflection all the things by y axial</label>
+		<input type="range" id="reflection" name="reflection" style="width:400px;"
+			min="-1" max="1" value="-1" step="2"/>	
 
 
 	</fieldset>
