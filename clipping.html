@@ -1,35 +1,5 @@
 <!--
-一開始被存到buffer裏，buffer被開在handle裡面，但一開始只是暫存
-之後因為program需要畫圖，program會去bind
-program會再把東西存到attribute
-shader會讀attribute裡的東西
-然後去進行drawarray的動作
--------------------------------------------
-done_bonus:
-1. Shiness 作法：改動 vec3 specular = lightColor[i] * ks * pow(cosAlpha, 16.0);最後面的數字，數字越小亮度越高
-2. 黃金model:  fragcolor = vec4(gouraud, 1.0); 最後一個數字改的超級小就會像是黃金色
-/
-Bonus:
-*** 1. 五樣東西
-*** 2. 五種燈光：調整燈光的按鈕
-/
-*** 3. texture mapping （只有茶壺可以用）
-放兩隻袋鼠-> 正常袋鼠、金屬袋鼠
-*** 8. 做 Reflection 第一份講義p.51
-/
-線條感的model不知道怎麼做或者是點狀的 中間簍空
-** 6. clipping，搬移clipping window （下週再做）
--------
-Demo 要求1: 有可能要你把兩個不重疊的東西重疊，設定在同一個位置就好 (part of "translate")
-Demo 要求2: 要怎麼做到繞著衛星轉：先放大(後寫)在旋轉(先)
------
-Ref: 
-1. canvas邊框：https://www.wibibi.com/info.php?tid=89
-上面這個網址還可以改bottom的顏色
-
-
-
-reflection -> 燈光顏色反了
+Clipping
 -->
 <html>
 
@@ -57,7 +27,6 @@ reflection -> 燈光顏色反了
     varying vec3 vertex_shiness;
     varying vec3 vertex_gloden;
     varying vec3 vertex_reflection;
-    varying vec3 vertex_saturation;
     varying vec3 vertex_clipping_line;
 
     void main(void) {
@@ -70,8 +39,7 @@ reflection -> 燈光顏色反了
         float shiness = vertex_shiness.x; // only extract the first value
         float gloden = vertex_gloden.x;   //only extract the first value
         float reflection = vertex_reflection.x; //only extract the first value
-        float saturation = vertex_saturation.x; // only extract the first value
-        float clipping_line = vertex_clipping_line.x; 
+        float clipping_line = vertex_clipping_line.x;
 
         vec3 gouraud = vec3(0.0, 0.0, 0.0);
         vec3 finalColor = vec3(0.0, 0.0, 0.0);
@@ -85,26 +53,25 @@ reflection -> 燈光顏色反了
         vec3 mvNormal = normalMVMatrix * aVertexNormal;
         vec3 N = vec3(0.0, 0.0, 0.0);//N: Normal
 
-        vec3 light[6];
-        vec3 lightColor[6];
+
+        vec3 light[4];
+        vec3 lightColor[4];
         light[0] = vec3(0.0, 40, -40);
         light[1] = vec3(0.0, -40, -40);
         light[2] = vec3(40.0, 0.0, -40);
-        light[3] = vec3(0.0, 10, 40);
-        light[4] = vec3(0.0, 10, 80);
-        light[5] = vec3(40, 0, -60);
+        light[3] = vec3(0.0, 00, 40);
+
         lightColor[0] = vec3(1.5, 0.0, 0.0);
         lightColor[1] = vec3(0.0, 1.5, 0.0);
         lightColor[2] = vec3(0.0, 0.0, 1.0);
-        lightColor[3] = vec3(1.0, 1.0, 1.0);
-        lightColor[4] = vec3(0.20, 0.0, 0.0);
-        lightColor[5] = vec3(0.78, 0.78, 0.78);
+        lightColor[3] = vec3(0.0, 0.0, 0.5);
 
-        if (shading == 1.0 || shading == 3.0){ //gouraud shading
+
+        if (shading == 1.0){ //gouraud shading
             gl_FragColor = fragcolor;
             return;
         }
-        
+
         if(reflection == 1.0){
         	for(int i = 0; i < 5; i++){
         		light[i].x = -light[i].x;
@@ -112,14 +79,12 @@ reflection -> 燈光顏色反了
         	}
     	}
 
-        for(int i = 0; i < 6; i++){
+
+        for(int i = 0; i < 4; i++){
             if(shading == 0.0){ //flat shading
                 N = normalize(cross(dFdx(-mvVertex), dFdy(-mvVertex)));
-                /*if(i > 4){
-                    break;
-                }*/
             }
-            else { //phong shading
+            else{ //phong shading
                 N = normalize(aVertexNormal);
             } 
             vec3 V = -normalize(mvVertex);
@@ -127,18 +92,19 @@ reflection -> 燈光顏色反了
             vec3 H = normalize(L+V);
 
             vec3 ambient = lightColor[i] * ka * aFrontColor;
-            float cos = max(dot(L, N), saturation); //一般來說這個最後面的值應該填入0，但隨著他變大，飽和度會變高
+            float cos = max(dot(L, N), 0.0);
             vec3 diffuse = lightColor[i] * kd * aFrontColor * cos;
             float cosAlpha = max(dot(H, N), 0.0);
             vec3 specular = lightColor[i] * ks * pow(cosAlpha, shiness);
-            //gouraud += (ambient + diffuse + specular);
             finalColor += (ambient + diffuse + specular);
         }
         if(mvVertex.x > clipping_line){
-            gl_FragColor = vec4(0.4, 0.7, 0.4, 1.0);
+            gl_FragColor = vec4(1, 1, 0.8, 0.0);
         } else{
             gl_FragColor = vec4(finalColor, gloden);
         }
+        
+
     }
 </script>
 
@@ -154,8 +120,8 @@ reflection -> 燈光顏色反了
     uniform vec3 shiness;
     uniform vec3 gloden;
     uniform vec3 reflection;
-    uniform vec3 saturation;
     uniform vec3 clipping_line;
+
 
 	varying vec4 fragcolor;
 
@@ -169,8 +135,8 @@ reflection -> 燈光顏色反了
     varying vec3 vertex_shiness;
     varying vec3 vertex_gloden;
     varying vec3 vertex_reflection;
-    varying vec3 vertex_saturation;
     varying vec3 vertex_clipping_line;
+
 
 
     void main(void) {
@@ -184,30 +150,14 @@ reflection -> 燈光顏色反了
         vertex_shiness = shiness;
         vertex_gloden = gloden;
         vertex_reflection = reflection;
-        vertex_saturation = saturation;
         vertex_clipping_line = clipping_line;
         
         gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
-
-        vec3 light[5];
-        vec3 lightColor[5];
-        light[0] = vec3(30, 20, -25);
-        light[1] = vec3(-30, 20, -25);
-        light[2] = vec3(0, 20, -25);
-        light[3] = vec3(0, -40, 0);
-        light[4] = vec3(-50, 10, -40);
-        lightColor[0] = vec3(1.0, 0.0, 0.0);
-        lightColor[1] = vec3(0.0, 1.0, 0.0);
-        lightColor[2] = vec3(0.0, 0.0, 1.0);
-        lightColor[3] = vec3(0.5, 0.5, 0.5);
-        lightColor[4] = vec3(0.3, 0.3, 0.4);
 		
+        //reflection
 		if(reflection.x == 1.0){
 			gl_Position.x = -gl_Position.x;
-            for(int i = 0; i < 5; i++){
-                light[i].x = -light[i].x;
-            }
-		}        
+		}    
 
         vec3 mvVertex = (uMVMatrix * vec4(aVertexPosition, 1.0)).xyz;
         mat3 normalMatrix = mat3(uMVMatrix);
@@ -216,14 +166,23 @@ reflection -> 燈光顏色反了
         
         vec3 gouraud = vec3(0.0, 0.0, 0.0);
 
-
-        // gouraud shading
         if(shading.x == 1.0){
             float ka = 0.03;
             float kd = 0.8;
             float ks = 0.8;
+            
+            vec3 light[4];
+            vec3 lightColor[4];
+            light[0] = vec3(30, 0, -60);
+            light[1] = vec3(-30, 0, -60);
+            light[2] = vec3(0, 0, -40);
+            light[3] = vec3(0, 0, 60);
+            lightColor[0] = vec3(1.0, 0.0, 0.0);
+            lightColor[1] = vec3(0.0, 1.0, 0.0);
+            lightColor[2] = vec3(0.0, 0.0, 2.0);
+            lightColor[3] = vec3(1.0, 1.0, 1.0);
 
-            for(int i = 0; i < 5; i++){ //燈光數目
+            for(int i = 0; i < 4; i++){ //燈光數目
                 vec3 V = -normalize(mvVertex);
                 vec3 N = normalize(mvNormal);
                 vec3 L = normalize(light[i] - mvVertex);
@@ -239,31 +198,7 @@ reflection -> 燈光顏色反了
             }
             fragcolor = vec4(gouraud, gloden.x);//最後一個直好像是透明度，數字越小會有黃金的感覺
         }
-        
-        if(shading.x == 3.0){
-            float ka = 0.4;
-            float kd = 0.4;
-            float ks = 0.8;
-            
-            for(int i = 0; i < 4; i++){ //燈光數目
-                vec3 V = -normalize(mvVertex);
-                vec3 N = normalize(mvNormal);
-                vec3 L = normalize(light[i] - mvVertex);
-                vec3 H = normalize(L+V);
 
-                vec3 ambient = lightColor[i] * ka * aFrontColor;
-                float cos = max(dot(L,N), 0.0);
-                vec3 diffuse = lightColor[i] * kd * aFrontColor * cos;
-                float cosAlpha = max(dot(H,N), -1.0);
-                vec3 specular = lightColor[i] * ks * pow(cosAlpha, shiness.x); 
-
-                gouraud += (ambient + diffuse + specular);
-            }
-            fragcolor = vec4(gouraud, gloden.x);        
-        }
-
-        //fragcolor = vec4(aFrontColor, 1.0);
-        //gl_Position =  uPMatrix * uMVMatrix * vec4(aVertexPosition.x, aVertexPosition.y, aVertexPosition.z, 1.0);
     }
 </script>
 
@@ -271,8 +206,8 @@ reflection -> 燈光顏色反了
     // common variables
     var gl;
     var shaderProgram;
-    var numOfThings = 5;
-    var model_name = ['Teapot', 'Mig27', 'Car_road', 'Kangaroo', 'trytry'];
+    var numOfThings = 1;
+    var model_name = ['Mig27'];
 
     var modelViewMatrix = [];
     var projectionMatirx = [];
@@ -280,8 +215,8 @@ reflection -> 燈光顏色反了
     var shiness = [];
     var gloden = [];
     var reflection = [];
-    var saturation = [];
     var clipping_line = [];
+
 
     for(var i = 0; i < numOfThings; i++) {
         modelViewMatrix.push(mat4.create());
@@ -290,26 +225,38 @@ reflection -> 燈光顏色反了
         shiness.push(vec3.create());
         gloden.push(vec3.create());
         reflection.push(vec3.create());
-        saturation.push(vec3.create());
         clipping_line.push(vec3.create());
     }
-
-    var translateMinMaxBound = [[-20, 20], [-20, 20], [-20, 20], [-20, 20], [-20, 20]];
-    var rotateMinMaxBound = [[-1, 1], [-1, 1], [-1, 1], [-1, 1], [-1, 1]];
-    var scaleMinMaxBound = [[0.1, 1.5], [10, 30], [20, 40], [20, 40], [20, 40]];
-    var shearMinMaxBound = [[45, 135], [45, 135], [45, 135],[45, 135], [45, 135]];
+    //for CSIE:
+    var translateMinMaxBound = [[-20, 20]];
+    var rotateMinMaxBound = [[-1, 1]];
+    var scaleMinMaxBound = [[10, 25]];
+    var shearMinMaxBound = [[45, 135]];
     
-    var translateMatrix = [[-10, 0, -60], [40, 20, -80], [65, -15, -60], [-50, -13, -40], [-66, 12, -40]];
-    var rotateMatirx = [[0, -1, 0], [0, 1, 1], [1, 1, 0], [0, 0, 1], [0, 0, 1]];
-    var scaleMatrix = [[1.0,1.0,1.0], [20,20,20], [20,20,20], [20,20,20], [20,20,20]];
-    var shearMatrix = [[90,0,0],[90,0,0],[90,0,0],[90,0,0], [90,0,0]];
+    var translateMatrix = [[-10, -10, -60]];
+    var rotateMatirx = [[0, 0, 1]];
+    var scaleMatrix = [[40.0, 40.0, 40.0]];
+    var shearMatrix = [[90,0,0]];
     var shading = 0;
     var shiness = 20.0;
     var gloden = 1.0;
     var reflection = -1.0;
-    var saturation = 0.0;
-    var clipping_line = 100.0;
-
+    var clipping_line = 3.0;
+    
+    //for teapot
+    /*var translateMinMaxBound = [[-20, 20]];
+    var rotateMinMaxBound = [[-1, 1]];
+    var scaleMinMaxBound = [[0.1, 2.5]];
+    var shearMinMaxBound = [[45, 135]];
+    
+    var translateMatrix = [[0, 0, -60]];
+    var rotateMatirx = [[0, 1, 0]];
+    var scaleMatrix = [[2.0, 2.0, 2.0]];
+    var shearMatrix = [[90,0,0]];
+    var shading = 0;
+    var shiness = 20.0;
+    var gloden = 1.0;
+    var reflection = -1.0;*/
     /*window.setInterval(() => {
         translateMatrix[0][0] += 10
     }, 3000)*/
@@ -409,21 +356,18 @@ reflection -> 燈光顏色反了
        	shaderProgram.shiness         = gl.getUniformLocation(shaderProgram, "shiness");
        	shaderProgram.gloden          = gl.getUniformLocation(shaderProgram, "gloden");
         shaderProgram.reflection      = gl.getUniformLocation(shaderProgram, "reflection");
-        shaderProgram.saturation      = gl.getUniformLocation(shaderProgram, "saturation");
         shaderProgram.clipping_line   = gl.getUniformLocation(shaderProgram, "clipping_line");
-
     }
 
 
     function setMatrixUniforms(i) {
         gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, projectionMatirx[i]);
         gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, modelViewMatrix[i]);
-        gl.uniform3fv(shaderProgram.shading, [shading, 0, 0]); //設定shading的地方
+        gl.uniform3fv(shaderProgram.shading, [0, 0, 0]); //設定shading的地方
         gl.uniform3fv(shaderProgram.shiness, [shiness, 0, 0]);
         gl.uniform3fv(shaderProgram.gloden, [gloden, 0, 0]);//設定gloden 的地方
-        gl.uniform3fv(shaderProgram.reflection, [reflection, 0, 0]);//設定 reflection 的地方
-        gl.uniform3fv(shaderProgram.saturation, [saturation, 0, 0]);//設定 saturation 的地方
-        gl.uniform3fv(shaderProgram.clipping_line, [clipping_line, 0, 0]);//設定 saturation 的地方
+        gl.uniform3fv(shaderProgram.reflection, [reflection, 0, 0]);//設定gloden 的地方
+        gl.uniform3fv(shaderProgram.clipping_line, [clipping_line, 0, 0]);//設定gloden 的地方
     }
 
     function degToRad(degrees) {
@@ -494,7 +438,7 @@ reflection -> 燈光顏色反了
                 return;
             }
             
-            mat4.perspective(60, gl.viewportWidth / gl.viewportHeight, 0.1, 100, projectionMatirx[i]);//最後面要放projection matrix
+            mat4.perspective(80, gl.viewportWidth / gl.viewportHeight, 0.1, 100, projectionMatirx[i]);//最後面要放projection matrix
             mat4.identity(modelViewMatrix[i]);// model view matrix
             mat4.translate(modelViewMatrix[i], translateMatrix[i]);//translate, z軸要設定在負的地方才會看得到，因為預設是看往(0,0,-1)，因此是設負的
             mat4.rotate(modelViewMatrix[i], degToRad(teapotAngle), rotateMatirx[i]);//rotation：照著哪個軸心轉: 分別是x,y,z
@@ -542,7 +486,6 @@ reflection -> 燈光顏色反了
 	var input_shiness;
 	var input_gloden;
 	var input_reflection;
-    var input_saturation;
     var input_clipping_line;
 
     function webGLStart() {
@@ -554,7 +497,7 @@ reflection -> 燈光顏色反了
             loadThing(model_name[i], i);
         }
 
-        gl.clearColor(0.4, 0.7, 0.4, 1.0);
+        gl.clearColor(1, 1, 0.8, 0.0);
         gl.enable(gl.DEPTH_TEST);
 		
 		input_translate = document.getElementById('translate');
@@ -575,11 +518,9 @@ reflection -> 燈光顏色反了
         input_reflection = document.getElementById('reflection');
         input_reflection.onclick = change_reflection;
 
-        input_saturation = document.getElementById('saturation');
-        input_saturation.onclick = change_saturation;
-
         input_clipping_line = document.getElementById('clipping_line');
-        input_clipping_line.onclick = change_clipping_line;
+        input_clipping_line.onclick = change_clipping_line;        
+
 
 		for(var i = 0; i < numOfThings; i++)
 		{
@@ -606,7 +547,7 @@ reflection -> 燈光顏色反了
 	}
     function change_shading() {
         shading = 1;
-        for (var i = 5; i < 9; i++) {
+        for (var i = 5; i < 8; i++) {
             if (document.getElementById(i).checked) {
                 shading = i - 5
                 break
@@ -614,36 +555,25 @@ reflection -> 燈光顏色反了
         }
     }
     function change_shiness(){
-    	shiness = 20.0;
-        for( var i = 0; i < numOfThings; i++){
+    	for( var i = 0; i < numOfThings; i++){
     		shiness = parseFloat(input_shiness.value);
     	}
     }
     function change_gloden(){
-        gloden = 1.0;
     	for( var i = 0; i < numOfThings; i++){
     		gloden = parseFloat(input_gloden.value);
     	}    
     }
-    function change_reflection(){ 
-        reflection = -1.0;
-        for( var i = 0; i < numOfThings; i++){
-            reflection = parseFloat(input_reflection.value);
-        }    
+    function change_reflection(){ //8: normally, 9: reflection
+    	for( var i = 0; i < numOfThings; i++){
+    		reflection = parseFloat(input_reflection.value);
+    	}    
     }
-    function change_saturation(){ 
-        saturation = 0.0;
-        for( var i = 0; i < numOfThings; i++){
-            saturation = parseFloat(input_saturation.value);
-        }    
-    }
-    function change_clipping_line(){ 
-        clipping_line = 100.0;
+    function change_clipping_line(){
         for( var i = 0; i < numOfThings; i++){
             clipping_line = parseFloat(input_clipping_line.value);
-        }    
-    }    
-
+        }         
+    }
 	function model_chg(){
 		for(var i = 0; i < numOfThings; i++){
 			if(input_model[i].checked){
@@ -677,14 +607,10 @@ reflection -> 燈光顏色反了
 				input_reflection.max = 1.0;
 				input_reflection.min =-1.0;
 
-                //saturation
-                input_saturation.value = saturation[i];
-                input_saturation.max = 0.0;
-                input_saturation.min = -3.0;     
-
+                //clipping_line
                 input_clipping_line.value = clipping_line[i];
-                input_clipping_line.max = 100.0;
-                input_clipping_line.min = -60.0;                            
+                input_clipping_line.max = 20.0;
+                input_clipping_line.min = 0.01;
 
 				break;
 			}
@@ -707,27 +633,23 @@ reflection -> 燈光顏色反了
 </head>
 
 <body onload="webGLStart();">
-    <canvas id="ICG-canvas" style="border-width:10px;border-style:outset;border-color:#009400;padding:5px;background-color:orange;margin-right:5px;" width="1540" height="450"></canvas>
+    <canvas id="ICG-canvas" style="border-width:10px;border-style:outset;border-color:#009400;padding:5px;background-color:orange;margin-right:5px;" width="1540" height="480"></canvas>
     <br/>
     <br/>
 
     <form onchange="model_chg()">
         Model<br>
         <input type="radio" id="0" name="model" checked> Teapot
-        <input type="radio" id="1" name="model"> Mig27
-        <input type="radio" id="2" name="model"> Car_road
-        <input type="radio" id="3" name="model"> Kangaroo
-        <input type="radio" id="4" name="model"> Sliver Kangaroo
+        <input type="radio" id="1" name="model"> 
     </form>
     <form onchange="change_shading()">
         Shading<br>
         <input type="radio" id="5" name="shading" checked> Flat Shading
         <input type="radio" id="6" name="shading"> Gouraud Shading
         <input type="radio" id="7" name="shading"> Phong Shading
-        <input type="radio" id="8" name="shading"> Front Shading (only color the front phase)
     </form>
 	<fieldset>
-		<legend>Transformation for "only one" thing</legend>
+		<legend>Transformation</legend>
 		<label for="translate">Translate</label>
 		<input type="range" id="translate" name="translate" style="width:400px;"
 			min="-10" max="10" value="0" step="0.1"/>
@@ -745,11 +667,9 @@ reflection -> 燈光顏色反了
 		<label for="shear">Shear</label>
 		<input type="range" id="shear" name="shear" style="width:400px;"
 			min="45" max="135" value="90" step="0.1"/>
-	</fieldset>
-	<br>
-	<br>
-	<fieldset>
-		<legend>Transformation for "All" the things</legend>
+        <br>
+        <br>
+
 		<label for="shiness">Shiness</label>
 		<input type="range" id="shiness" name="shiness" style="width:400px;"
 			min="0.01" max="20" value="18" step="0.01"/>
@@ -757,22 +677,16 @@ reflection -> 燈光顏色反了
 		<label for="gloden">Gloden</label>
 		<input type="range" id="gloden" name="gloden" style="width:400px;"
 			min="0.01" max="1" value="1" step="0.005"/>
-        <br>
-        <br>
+		<br>
+		<br>
+		
+		<label for="reflection">Reflection all the things by y axial</label>
+		<input type="range" id="reflection" name="reflection" style="width:400px;"
+			min="-1" max="1" value="-1" step="2"/>	
 
-        <label for="reflection">Reflection all the things by y axial</label>
-        <input type="range" id="reflection" name="reflection" style="width:400px;"
-            min="-1" max="1" value="-1" step="2"/>  
-
-        <label for="saturation">Saturation (Only for Flat and Phong shading)</label>
-        <input type="range" id="saturation" name="saturation" style="width:400px;"
-            min="-3.0" max="0.0" value="0" step="-3.0"/>
-        <br>
-        <br>
-
-        <label for="clipping_line">Clipping_line (Suggested for Phong Shading!)</label>
+        <label for="clipping_line">Clipping_line</label>
         <input type="range" id="clipping_line" name="clipping_line" style="width:400px;"
-            min="-60" max="100" value="10" step="5"/>  
+            min="-25" max="15" value="15" step="0.5"/>
 
 	</fieldset>
 
